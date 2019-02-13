@@ -45,3 +45,10 @@ go
 
 delete from [Sales].[Customers]
 where [CustomerName] = 'CustomerName50'
+
+go 
+
+update [Sales].[Customers]
+set [DeliveryMethodID] = 1,
+	[CustomerName] = 'CustomerName21'
+where [CustomerName] = 'CustomerName20'
