@@ -40,3 +40,8 @@ values
 ('CustomerName30', 1, 3, 1, 1011, 1012, 3, 20672, 20672, '2013-01-01', 0.000, 0, 0, 7, '(239) 555-0199', '(239) 555-0199', 'https://example.com/CustomerName1', 'DeliveryAddressLine1', 'Code1', 'PostalAddressLine1', 'Code1', 1),
 ('CustomerName40', 1, 3, 1, 1011, 1012, 3, 20672, 20672, '2013-01-01', 0.000, 0, 0, 7, '(239) 555-0199', '(239) 555-0199', 'https://example.com/CustomerName1', 'DeliveryAddressLine1', 'Code1', 'PostalAddressLine1', 'Code1', 1),
 ('CustomerName50', 1, 3, 1, 1011, 1012, 3, 20672, 20672, '2013-01-01', 0.000, 0, 0, 7, '(239) 555-0199', '(239) 555-0199', 'https://example.com/CustomerName1', 'DeliveryAddressLine1', 'Code1', 'PostalAddressLine1', 'Code1', 1);
+
+go 
+
+delete from [Sales].[Customers]
+where [CustomerName] = 'CustomerName50'
