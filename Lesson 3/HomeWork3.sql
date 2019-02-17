@@ -405,3 +405,71 @@ when not matched
       ,source.[PostalPostalCode]
       ,source.[LastEditedBy])
 output inserted.*, $action, inserted.*;
+
+--BCP OUT AND BULK INSERT
+
+EXEC sp_configure 'show advanced options', 1;  
+GO  
+-- To update the currently configured value for advanced options.  
+RECONFIGURE;  
+GO  
+-- To enable the feature.  
+EXEC sp_configure 'xp_cmdshell', 1;  
+GO  
+-- To update the currently configured value for this feature.  
+RECONFIGURE;  
+GO  
+
+exec master..xp_cmdshell 'bcp "Select * from [WideWorldImporters].Sales.Customer_Temp" queryout  "D:\Customers.txt" -T -w -t"@@dsgsdf$$"'
+
+truncate table [Sales].[Customer_Temp];
+
+DECLARE 
+	@path VARCHAR(256),
+	@FileName VARCHAR(256),
+	@onlyScript BIT, 
+	@query	nVARCHAR(MAX),
+	@dbname VARCHAR(255),
+	@batchsize INT,
+	@delimiter varchar(100)
+
+	SET @dbname = DB_NAME();
+	SET @batchsize = 1000;
+	SET @path = 'D:\';
+	SET @FileName = 'Customers.txt';
+	SET @onlyScript = 1;
+	set @delimiter = '@@dsgsdf$$';
+	set @onlyScript = 0;
+
+	BEGIN TRY
+
+		IF @FileName IS NOT NULL
+		BEGIN
+			SET @query = 'BULK INSERT ['+@dbname+'].[Sales].[Customer_Temp]
+				   FROM "'+@path+@FileName+'"
+				   WITH 
+					 (
+						BATCHSIZE = '+CAST(@batchsize AS VARCHAR(255))+', 
+						DATAFILETYPE = ''widechar'',
+						FIELDTERMINATOR = '''+ @delimiter +''',
+						ROWTERMINATOR =''\n'',
+						KEEPNULLS,
+						TABLOCK        
+					  );'
+
+			PRINT @query
+
+			IF @onlyScript = 0
+				EXEC sp_executesql @query 
+			PRINT 'Bulk insert '+@FileName+' is done, current time '+CONVERT(VARCHAR, GETUTCDATE(),120);
+		END;
+	END TRY
+
+	BEGIN CATCH
+		SELECT   
+			ERROR_NUMBER() AS ErrorNumber  
+			,ERROR_MESSAGE() AS ErrorMessage; 
+
+		PRINT 'ERROR in Bulk insert '+@FileName+' , current time '+CONVERT(VARCHAR, GETUTCDATE(),120);
+
+	END CATCH
