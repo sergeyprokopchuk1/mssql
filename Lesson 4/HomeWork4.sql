@@ -34,3 +34,23 @@ go
 select P.PersonID, P.FullName
 from [Application].[People] as P
 where P.PersonID not in (select * from SalespersonsCTE)
+
+
+--2. Выберите товары с минимальной ценой (подзапросом), 2 варианта подзапроса. 
+
+select I.StockItemID, 
+	I.StockItemName,
+	I.UnitPrice
+	, (select Min([Warehouse].[StockItems].UnitPrice)  from [Warehouse].[StockItems]) as MinPrice
+from [Warehouse].[StockItems] as I
+where I.UnitPrice = (select Min([Warehouse].[StockItems].UnitPrice)  from [Warehouse].[StockItems])
+
+
+select I.StockItemID, 
+	I.StockItemName,
+	I.UnitPrice
+	, (select Min([Warehouse].[StockItems].UnitPrice)  from [Warehouse].[StockItems]) as MinPrice
+from [Warehouse].[StockItems] as I
+where I.UnitPrice <= All (select Min([Warehouse].[StockItems].UnitPrice)  from [Warehouse].[StockItems])
+
+--3. Выберите всех клиентов у которых было 5 максимальных оплат из [Sales].[CustomerTransactions] представьте 3 способа (в том числе с CTE)
