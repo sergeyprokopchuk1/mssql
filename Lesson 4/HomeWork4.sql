@@ -119,3 +119,86 @@ join CustomerTransactionCTE as CTCTE
 
 --4. Выберите города (ид и название), в которые были доставлены товары входящие в тройку самых дорогих товаров, а также Имя сотрудника, 
 --который осуществлял упаковку заказов
+
+select ItemTrans.StockItemTransactionID, Item.UnitPrice, City.CityID, City.CityName, Person.FullName
+from [Warehouse].[StockItemTransactions] as ItemTrans
+
+join (select top(3) Items.UnitPrice, Items.StockItemID
+from [Warehouse].[StockItems] as Items
+group by Items.UnitPrice, Items.StockItemID
+order by Items.UnitPrice desc) as Item
+on Item.StockItemID = ItemTrans.StockItemID
+
+join (select City.CityID, City.CityName, C.CustomerID
+from [Application].Cities as City
+inner join [Sales].Customers as C
+on C.DeliveryCityID = City.CityID) as City
+on City.CustomerID = ItemTrans.CustomerID
+
+join (select P.PersonID, P.FullName, I.InvoiceID
+from [Application].[People] as P
+inner join [Sales].Invoices as I
+on I.PackedByPersonID = P.PersonID
+group by P.PersonID, P.FullName, I.InvoiceID) as Person
+on Person.InvoiceID = ItemTrans.InvoiceID
+
+--with CTE
+
+; with StockItemCTE (MaxPrice, StockItemID) as
+(
+	select top(3) Items.UnitPrice as MaxPrice, Items.StockItemID
+	from [Warehouse].[StockItems] as Items
+	group by Items.UnitPrice, Items.StockItemID
+	order by Items.UnitPrice desc
+),
+CityCTE (CityID, CityName, CustomerID) as 
+(
+	select City.CityID, City.CityName, C.CustomerID
+	from [Application].Cities as City
+	inner join [Sales].Customers as C
+	on C.DeliveryCityID = City.CityID
+), 
+PackedPersonCTE (FullName, InvoiceID) as
+(
+	select P.FullName, I.InvoiceID
+	from [Application].[People] as P
+	inner join [Sales].Invoices as I
+	on I.PackedByPersonID = P.PersonID
+	group by P.FullName, I.InvoiceID
+)
+select ItemTrans.StockItemTransactionID, Item.MaxPrice, City.CityID, City.CityName, Person.FullName
+from [Warehouse].[StockItemTransactions] as ItemTrans
+join StockItemCTE as Item
+on Item.StockItemID = ItemTrans.StockItemID
+join CityCTE as City
+on City.CustomerID = ItemTrans.CustomerID
+join PackedPersonCTE as Person
+on Person.InvoiceID = ItemTrans.InvoiceID
+
+--5 Объясните, что делает и оптимизируйте запрос:
+--Приложите план запроса и его анализ, а также ход ваших рассуждений по поводу оптимизации. 
+--Можно двигаться как в сторону улучшения читабельности запроса (что уже было в материале лекций), так и в сторону упрощения плана\ускорения.
+
+SELECT 
+Invoices.InvoiceID, 
+Invoices.InvoiceDate,
+(SELECT People.FullName
+FROM Application.People
+WHERE People.PersonID = Invoices.SalespersonPersonID
+) AS SalesPersonName,
+SalesTotals.TotalSumm AS TotalSummByInvoice, 
+(SELECT SUM(OrderLines.PickedQuantity*OrderLines.UnitPrice)
+FROM Sales.OrderLines
+WHERE OrderLines.OrderId = (SELECT Orders.OrderId 
+FROM Sales.Orders
+WHERE Orders.PickingCompletedWhen IS NOT NULL	
+AND Orders.OrderId = Invoices.OrderId)	
+) AS TotalSummForPickedItems
+FROM Sales.Invoices 
+JOIN
+(SELECT InvoiceId, SUM(Quantity*UnitPrice) AS TotalSumm
+FROM Sales.InvoiceLines
+GROUP BY InvoiceId
+HAVING SUM(Quantity*UnitPrice) > 27000) AS SalesTotals
+ON Invoices.InvoiceID = SalesTotals.InvoiceID
+ORDER BY TotalSumm DESC
