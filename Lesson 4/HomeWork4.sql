@@ -180,20 +180,20 @@ on Person.InvoiceID = ItemTrans.InvoiceID
 --Можно двигаться как в сторону улучшения читабельности запроса (что уже было в материале лекций), так и в сторону упрощения плана\ускорения.
 
 SELECT 
-Invoices.InvoiceID, 
-Invoices.InvoiceDate,
-(SELECT People.FullName
-FROM Application.People
-WHERE People.PersonID = Invoices.SalespersonPersonID
-) AS SalesPersonName,
-SalesTotals.TotalSumm AS TotalSummByInvoice, 
-(SELECT SUM(OrderLines.PickedQuantity*OrderLines.UnitPrice)
-FROM Sales.OrderLines
-WHERE OrderLines.OrderId = (SELECT Orders.OrderId 
-FROM Sales.Orders
-WHERE Orders.PickingCompletedWhen IS NOT NULL	
-AND Orders.OrderId = Invoices.OrderId)	
-) AS TotalSummForPickedItems
+	Invoices.InvoiceID, 
+	Invoices.InvoiceDate,
+	(SELECT People.FullName
+	FROM Application.People
+	WHERE People.PersonID = Invoices.SalespersonPersonID
+	) AS SalesPersonName,
+	SalesTotals.TotalSumm AS TotalSummByInvoice, 
+	(SELECT SUM(OrderLines.PickedQuantity*OrderLines.UnitPrice)
+	FROM Sales.OrderLines
+	WHERE OrderLines.OrderId = (SELECT Orders.OrderId 
+		FROM Sales.Orders
+		WHERE Orders.PickingCompletedWhen IS NOT NULL	
+		AND Orders.OrderId = Invoices.OrderId)	
+	) AS TotalSummForPickedItems
 FROM Sales.Invoices 
 JOIN
 (SELECT InvoiceId, SUM(Quantity*UnitPrice) AS TotalSumm
@@ -202,3 +202,36 @@ GROUP BY InvoiceId
 HAVING SUM(Quantity*UnitPrice) > 27000) AS SalesTotals
 ON Invoices.InvoiceID = SalesTotals.InvoiceID
 ORDER BY TotalSumm DESC
+
+--Выборка показывает счета с именами продажников, показывается общая сумма всех уже зкомплектованих товаров, в которых сумма счета больше 27000.
+--Выборка отсортирована по общей сумме счета от большего к меньшему.
+
+; with InvoiceCTE (InvoiceID, TotalSumm, InvoiceDate, SalespersonPersonID, OrderID) as
+(
+	select I.InvoiceID, SalesTotals.TotalSumm, I.InvoiceDate, I.SalespersonPersonID, I.OrderID
+	FROM Sales.Invoices as I
+	JOIN
+		(SELECT InvoiceId, SUM(Quantity*UnitPrice) AS TotalSumm
+		FROM Sales.InvoiceLines
+		GROUP BY InvoiceId
+		HAVING SUM(Quantity*UnitPrice) > 27000) AS SalesTotals
+		ON I.InvoiceID = SalesTotals.InvoiceID
+)
+SELECT 
+	InvoiceCTE.InvoiceID, 
+	InvoiceCTE.InvoiceDate,
+	(SELECT People.FullName
+	FROM Application.People
+	WHERE People.PersonID = InvoiceCTE.SalespersonPersonID
+	) AS SalesPersonName,
+	InvoiceCTE.TotalSumm AS TotalSummByInvoice, 
+	(SELECT SUM(OrderLines.PickedQuantity*OrderLines.UnitPrice)
+	FROM Sales.OrderLines
+	WHERE OrderLines.OrderId = (SELECT Orders.OrderId 
+		FROM Sales.Orders
+		WHERE Orders.PickingCompletedWhen IS NOT NULL	
+		AND Orders.OrderId = InvoiceCTE.OrderId)	
+	) AS TotalSummForPickedItems
+
+from InvoiceCTE
+ORDER BY InvoiceCTE.TotalSumm DESC
