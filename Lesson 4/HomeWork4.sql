@@ -19,34 +19,47 @@ go
 --
 select P.PersonID, P.FullName
 from [Application].[People] as P
-where P.PersonID not in (select O.SalespersonPersonID
-	from [Sales].[Orders] as O
-	)
+where not exists (select I.SalespersonPersonID
+	from [Sales].[Invoices] as I
+	where I.SalespersonPersonID = P.PersonID)
+and P.IsSalesperson = 1
 
 go 
-
 
 ; with SalespersonsCTE(SalespersonPersonID) as 
 (
 	select O.SalespersonPersonID
-	from [Sales].[Orders] as O
+	from [Sales].[Invoices] as O
 )
 select P.PersonID, P.FullName
 from [Application].[People] as P
-where P.PersonID not in (select * from SalespersonsCTE)
+where 
+not exists (select * from SalespersonsCTE where SalespersonPersonID = P.PersonID)
+and P.IsSalesperson = 1
+
+
+; with PersonCTE 
+as
+(
+	select P.PersonID, P.FullName
+	from [Application].[People] as P
+	where P.[IsSalesperson] = 1
+)
+select P.PersonID, P.FullName
+from PersonCTE as P
+where not exists (select  I.SalespersonPersonID from [Sales].[Invoices] as I
+where I.SalespersonPersonID = P.PersonID)
 
 
 --2. Выберите товары с минимальной ценой (подзапросом), 2 варианта подзапроса. 
 
--- 1 subquery with CTE
 select I.StockItemID, 
 	I.StockItemName,
 	I.UnitPrice
-	, (select Min([Warehouse].[StockItems].UnitPrice)  from [Warehouse].[StockItems]) as MinPrice
 from [Warehouse].[StockItems] as I
 where I.UnitPrice = (select Min([Warehouse].[StockItems].UnitPrice)  from [Warehouse].[StockItems])
 
--- looks weird but performance are the same
+--with CTE
 ; with MinPriceCTE(MinPrice) as
 (
 	select Min([Warehouse].[StockItems].UnitPrice)  
@@ -55,34 +68,12 @@ where I.UnitPrice = (select Min([Warehouse].[StockItems].UnitPrice)  from [Wareh
 select I.StockItemID, 
 	I.StockItemName,
 	I.UnitPrice
-	,(select MinPriceCTE.MinPrice from MinPriceCTE) as MinPrice
 from [Warehouse].[StockItems] as I
 where I.UnitPrice = (select MinPriceCTE.MinPrice from MinPriceCTE)
 
---2 subquery with CTE
-select I.StockItemID, 
-	I.StockItemName,
-	I.UnitPrice
-	, (select Min([Warehouse].[StockItems].UnitPrice)  from [Warehouse].[StockItems]) as MinPrice
-from [Warehouse].[StockItems] as I
-where I.UnitPrice <= All (select Min([Warehouse].[StockItems].UnitPrice)  from [Warehouse].[StockItems])
-
--- looks weird but performance is the same
-; with MinPriceCTE(MinPrice) as
-(
-	select Min([Warehouse].[StockItems].UnitPrice)  
-	from [Warehouse].[StockItems]
-)
-select I.StockItemID, 
-	I.StockItemName,
-	I.UnitPrice
-	, (select MinPriceCTE.MinPrice from MinPriceCTE) as MinPrice
-from [Warehouse].[StockItems] as I
-where I.UnitPrice <= All (select MinPriceCTE.MinPrice from MinPriceCTE)
-
 --3. Выберите всех клиентов у которых было 5 максимальных оплат из [Sales].[CustomerTransactions] представьте 3 способа (в том числе с CTE)
 
-select top(5)  C.CustomerID, C.CustomerName, Max(CT.TransactionAmount) as MaxAmount -- C.CustomerName, CT.TransactionAmount
+select top(5)  C.CustomerID, C.CustomerName, Max(CT.TransactionAmount) as MaxAmount
 from [Sales].[Customers] as C
 inner join [Sales].[CustomerTransactions] as CT
 on CT.CustomerID = C.CustomerID
@@ -91,56 +82,54 @@ order by MaxAmount desc
 
 go
 
-select top(5) C.CustomerID, 
+select C.CustomerID, 
 	C.CustomerName, 
 	CT.MaxAmount
 from [Sales].[Customers] as C
-join (select [Sales].[CustomerTransactions].[CustomerID], Max(TransactionAmount) as MaxAmount
+join (select top(5) [Sales].[CustomerTransactions].[CustomerID], Max(TransactionAmount) as MaxAmount
 	from [Sales].[CustomerTransactions]
-	group by [Sales].[CustomerTransactions].[CustomerID]) as CT
+	group by [Sales].[CustomerTransactions].[CustomerID]
+	order by MaxAmount desc) as CT
 	on C.CustomerID = CT.CustomerID
-	order by CT.MaxAmount desc
 
 go
 
 ; with CustomerTransactionCTE(CustomerID, MaxAmount) as 
 (
-	select [Sales].[CustomerTransactions].[CustomerID], Max(TransactionAmount) as MaxAmount
+	select top(5) [Sales].[CustomerTransactions].[CustomerID], Max(TransactionAmount) as MaxAmount
 	from [Sales].[CustomerTransactions]
 	group by [Sales].[CustomerTransactions].[CustomerID]
+	order by MaxAmount desc
 )
-select top(5) C.CustomerID, 
+select C.CustomerID, 
 	C.CustomerName, 
 	CTCTE.MaxAmount
 from [Sales].[Customers] as C
 join CustomerTransactionCTE as CTCTE
-	on C.CustomerID = CTCTE.CustomerID
-	order by CTCTE.MaxAmount desc
+on C.CustomerID = CTCTE.CustomerID
+	
 
 --4. Выберите города (ид и название), в которые были доставлены товары входящие в тройку самых дорогих товаров, а также Имя сотрудника, 
 --который осуществлял упаковку заказов
 
 select ItemTrans.StockItemTransactionID, Item.UnitPrice, City.CityID, City.CityName, Person.FullName
 from [Warehouse].[StockItemTransactions] as ItemTrans
-
 join (select top(3) Items.UnitPrice, Items.StockItemID
-from [Warehouse].[StockItems] as Items
-group by Items.UnitPrice, Items.StockItemID
-order by Items.UnitPrice desc) as Item
+	from [Warehouse].[StockItems] as Items
+	order by Items.UnitPrice desc) as Item
 on Item.StockItemID = ItemTrans.StockItemID
 
-join (select City.CityID, City.CityName, C.CustomerID
-from [Application].Cities as City
-inner join [Sales].Customers as C
-on C.DeliveryCityID = City.CityID) as City
-on City.CustomerID = ItemTrans.CustomerID
+join [Sales].[Customers] as Cust
+on Cust.CustomerID = ItemTrans.CustomerID
 
-join (select P.PersonID, P.FullName, I.InvoiceID
-from [Application].[People] as P
-inner join [Sales].Invoices as I
-on I.PackedByPersonID = P.PersonID
-group by P.PersonID, P.FullName, I.InvoiceID) as Person
-on Person.InvoiceID = ItemTrans.InvoiceID
+join [Application].[Cities] as City
+on Cust.DeliveryCityID = City.CityID
+
+join [Sales].[Invoices] as Inv
+on Inv.InvoiceID = ItemTrans.InvoiceID
+
+join [Application].[People] as Person
+on Inv.PackedByPersonID = Person.PersonID
 
 --with CTE
 
@@ -148,32 +137,25 @@ on Person.InvoiceID = ItemTrans.InvoiceID
 (
 	select top(3) Items.UnitPrice as MaxPrice, Items.StockItemID
 	from [Warehouse].[StockItems] as Items
-	group by Items.UnitPrice, Items.StockItemID
 	order by Items.UnitPrice desc
-),
-CityCTE (CityID, CityName, CustomerID) as 
-(
-	select City.CityID, City.CityName, C.CustomerID
-	from [Application].Cities as City
-	inner join [Sales].Customers as C
-	on C.DeliveryCityID = City.CityID
-), 
-PackedPersonCTE (FullName, InvoiceID) as
-(
-	select P.FullName, I.InvoiceID
-	from [Application].[People] as P
-	inner join [Sales].Invoices as I
-	on I.PackedByPersonID = P.PersonID
-	group by P.FullName, I.InvoiceID
 )
 select ItemTrans.StockItemTransactionID, Item.MaxPrice, City.CityID, City.CityName, Person.FullName
 from [Warehouse].[StockItemTransactions] as ItemTrans
+
 join StockItemCTE as Item
 on Item.StockItemID = ItemTrans.StockItemID
-join CityCTE as City
-on City.CustomerID = ItemTrans.CustomerID
-join PackedPersonCTE as Person
-on Person.InvoiceID = ItemTrans.InvoiceID
+
+join [Sales].[Customers] as Cust
+on Cust.CustomerID = ItemTrans.CustomerID
+
+join [Application].[Cities] as City
+on Cust.DeliveryCityID = City.CityID
+
+join [Sales].[Invoices] as Inv
+on Inv.InvoiceID = ItemTrans.InvoiceID
+
+join [Application].[People] as Person
+on Inv.PackedByPersonID = Person.PersonID
 
 --5 Объясните, что делает и оптимизируйте запрос:
 --Приложите план запроса и его анализ, а также ход ваших рассуждений по поводу оптимизации. 
@@ -215,23 +197,22 @@ ORDER BY TotalSumm DESC
 		FROM Sales.InvoiceLines
 		GROUP BY InvoiceId
 		HAVING SUM(Quantity*UnitPrice) > 27000) AS SalesTotals
-		ON I.InvoiceID = SalesTotals.InvoiceID
+	ON I.InvoiceID = SalesTotals.InvoiceID
 )
 SELECT 
 	InvoiceCTE.InvoiceID, 
 	InvoiceCTE.InvoiceDate,
 	(SELECT People.FullName
-	FROM Application.People
-	WHERE People.PersonID = InvoiceCTE.SalespersonPersonID
-	) AS SalesPersonName,
+		FROM Application.People
+		WHERE People.PersonID = InvoiceCTE.SalespersonPersonID
+		) AS SalesPersonName,
 	InvoiceCTE.TotalSumm AS TotalSummByInvoice, 
-	(SELECT SUM(OrderLines.PickedQuantity*OrderLines.UnitPrice)
-	FROM Sales.OrderLines
-	WHERE OrderLines.OrderId = (SELECT Orders.OrderId 
-		FROM Sales.Orders
-		WHERE Orders.PickingCompletedWhen IS NOT NULL	
-		AND Orders.OrderId = InvoiceCTE.OrderId)	
-	) AS TotalSummForPickedItems
-
+		(SELECT SUM(OrderLines.PickedQuantity*OrderLines.UnitPrice)
+		FROM Sales.OrderLines
+		WHERE OrderLines.OrderId = (SELECT Orders.OrderId 
+			FROM Sales.Orders
+			WHERE Orders.PickingCompletedWhen IS NOT NULL	
+			AND Orders.OrderId = InvoiceCTE.OrderId)	
+		) AS TotalSummForPickedItems
 from InvoiceCTE
 ORDER BY InvoiceCTE.TotalSumm DESC
