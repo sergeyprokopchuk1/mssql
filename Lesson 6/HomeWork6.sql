@@ -26,6 +26,10 @@ go
 
 -- 1.
 
+set statistics time on;
+
+Print('Query with Windows Function')
+
 select 
 	IL.InvoiceID,
 	I.InvoiceDate,
@@ -44,6 +48,8 @@ go
 
 -- есть проблемы с подзапросом. помесячно выводит, но без нарастающего итога
 
+Print(CHAR(13) + 'Query with Subquery')
+
 select 
 	IL.InvoiceID,
 	I.InvoiceDate,
@@ -53,9 +59,8 @@ select
 		from [Sales].[InvoiceLines] as ILInner
 		join [Sales].[Invoices] as IInner
 		on IInner.InvoiceID = ILInner.InvoiceID
-		where year(IInner.InvoiceDate) = year(I.InvoiceDate)
-		and month(IInner.InvoiceDate) = month(I.InvoiceDate)
-		and I.InvoiceDate  >= '2015-01-01'
+		where IInner.InvoiceDate  >= '2015-01-01' 
+		and IInner.InvoiceDate <= EOMONTH(I.InvoiceDate)
 		) as [Sale Amount by Month]
 from [Sales].[InvoiceLines] as IL
 join [Sales].[Invoices] as I
@@ -64,6 +69,13 @@ join [Sales].[Customers] as C
 on C.CustomerID = I.CustomerID
 where I.InvoiceDate  >= '2015-01-01'
 order by I.InvoiceDate, IL.Quantity*IL.UnitPrice, IL.InvoiceID, C.CustomerName
+
+
+set statistics time off;
+
+--Однозначно запрос с оконными функциями исполняется быстрее. CPU = 500 ms, elapsed time = 7800 ms.
+--Запрос с подзапросом исполняется дольше. CPU = 42750 ms, elapsed time = 44208 ms.
+
 
 -- 2. 2. Вывести список 2х самых популярных продуктов (по кол-ву проданных) в каждом месяце за 2016й год 
 --(по 2 самых популярных продукта в каждом месяце)
