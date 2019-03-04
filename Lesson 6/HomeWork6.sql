@@ -151,7 +151,7 @@ join [Sales].[CustomerTransactions] as CT
 on CT.InvoiceID = I.InvoiceID
 join [Sales].[Customers] as C
 on C.CustomerID = CT.CustomerID
-where P.IsSalesperson = 1
+where P.IsEmployee = 1
 order by P.PersonID
 
 
