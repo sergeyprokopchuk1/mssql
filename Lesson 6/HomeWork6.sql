@@ -126,7 +126,7 @@ select
 	,LEAD(It.StockItemID) over(order by It.StockItemName) as [Next ID]
 	,LAG(It.StockItemID) over(order by It.StockItemName) as [Prev ID]
 	,LAG(It.StockItemName, 2, 'No items') over(order by It.StockItemName)  as [Prev 2 Name]
-	,NTILE(30) over(partition by It.TypicalWeightPerUnit order by It.StockItemName) as [Grouped Weight Per Unit]
+	,NTILE(30) over(order by It.StockItemName) as [Grouped Weight Per Unit]
 from [Warehouse].[StockItems] as It
 
 
