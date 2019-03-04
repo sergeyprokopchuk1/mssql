@@ -84,21 +84,23 @@ set statistics time off;
 (
 	select 
 		Item.StockItemID, 
-		Item.StockItemName,
-		Inv.InvoiceDate,
-		InvLine.Quantity as [Item Quantity],
-		row_number() over(partition by month(Inv.InvoiceDate) order by InvLine.Quantity desc) as Quantity
+		year(Inv.InvoiceDate) as Years,
+		month(Inv.InvoiceDate) as Months,
+		sum(InvLine.Quantity) over(partition by Item.StockItemID, month(Inv.InvoiceDate) order by InvLine.Quantity desc) as [Sale Quantity],
+		row_number() over(partition by Item.StockItemID, month(Inv.InvoiceDate) order by InvLine.Quantity) as Quantity
 	from [Sales].[InvoiceLines] as InvLine
 	join [Warehouse].[StockItems] as Item
 	on Item.StockItemID = InvLine.StockItemID
 	join [Sales].[Invoices] as Inv
 	on Inv.InvoiceID = InvLine.InvoiceID
 	where year(Inv.InvoiceDate) = '2016'
+	group by Item.StockItemID, year(Inv.InvoiceDate),
+		month(Inv.InvoiceDate), InvLine.Quantity
 )
 select *
 from MonthQuantityCTE
 where MonthQuantityCTE.Quantity <= 2
-order by MonthQuantityCTE.InvoiceDate, MonthQuantityCTE.Quantity desc
+order by MonthQuantityCTE.StockItemID, MonthQuantityCTE.Years, MonthQuantityCTE.Months, MonthQuantityCTE.Quantity
 
 /*
 3. Функции одним запросом
