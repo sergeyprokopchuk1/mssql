@@ -44,7 +44,7 @@ where ST.SupplierID is null
 
 select O.OrderDate
 	,OL.PickingCompletedWhen
-	,datename(month, convert(char(8), O.OrderDate, 112)) as [Month Name]
+	,datename(month, O.OrderDate) as [Month Name]
 	,datepart(QUARTER, O.OrderDate) as [Quarter Number]
 	,(datepart(month, O.OrderDate)-1)/4 + 1 as [Third Number]
 from [Sales].[Orders] as O
@@ -65,8 +65,9 @@ select O.PurchaseOrderID
 from [Purchasing].[Suppliers] as S
 join [Purchasing].[PurchaseOrders] as O on O.SupplierID = S.SupplierID
 join [Application].[People] as P on O.ContactPersonID = P.PersonID
+join [Application].[DeliveryMethods] as D on D.DeliveryMethodID = O.DeliveryMethodID
 where year(O.OrderDate) = 2014
-and (O.DeliveryMethodID = 1 or O.DeliveryMethodID = 7)
+and (D.DeliveryMethodName = 'Road Freight' or D.DeliveryMethodName = 'Post')
 order by O.PurchaseOrderID
 
 --5. 10 последних по дате продаж с именем клиента и именем сотрудника, который оформил заказ.
