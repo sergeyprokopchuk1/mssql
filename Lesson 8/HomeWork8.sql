@@ -41,10 +41,6 @@ CountryId	CountryName	Code
 4. Перепишите ДЗ из оконных функций через CROSS APPLY 
 Выберите по каждому клиенту 2 самых дорогих товара, которые он покупал
 В результатах должно быть ид клиета, его название, ид товара, цена, дата покупки
-
-5. Code review (опционально). Запрос приложен в материалы Hometask_code_review.sql. 
-Что делает запрос? 
-Чем можно заменить CROSS APPLY - можно ли использовать другую стратегию выборки\запроса?
 */
 
 go
@@ -138,3 +134,53 @@ from
 	from [Application].[Countries] as C
 ) as Countries
 unpivot (Code for Code1 in([Alpha3Code], [NumericCode])) as unpvt
+
+/*
+4. Перепишите ДЗ из оконных функций через CROSS APPLY 
+Выберите по каждому клиенту 2 самых дорогих товара, которые он покупал
+В результатах должно быть ид клиета, его название, ид товара, цена, дата покупки
+
+*/
+
+--решение через оконные функции
+; with CustomersItemsCTE as
+(
+	select 
+		C.CustomerID,
+		C.CustomerName,
+		IL.StockItemID,
+		SI.UnitPrice,
+		I.InvoiceDate,
+		row_number() over(partition by C.CustomerID order by SI.UnitPrice desc) as Number
+	from [Sales].[Customers] as C
+	join [Sales].[CustomerTransactions] as CT on CT.CustomerID = C.CustomerID
+	join [Sales].[InvoiceLines] as IL on IL.InvoiceID = CT.InvoiceID
+	join [Warehouse].[StockItems] as SI	on SI.StockItemID = IL.StockItemID
+	join [Sales].[Invoices] as I on I.InvoiceID = IL.InvoiceID
+)
+select *
+from CustomersItemsCTE as Cust
+where Cust.Number <= 2
+order by  Cust.CustomerID, Cust.UnitPrice desc
+
+--решение через cross apply
+select OuterC.CustomerID,
+		OuterC.CustomerName,
+		InnerC.StockItemID,
+		InnerC.UnitPrice,
+		InnerC.InvoiceDate
+from [Sales].[Customers] as OuterC
+cross apply (
+	select top 2
+		IL.StockItemID,
+		SI.UnitPrice,
+		I.InvoiceDate
+	from [Sales].[Customers] as C
+	join [Sales].[CustomerTransactions] as CT on CT.CustomerID = C.CustomerID
+	join [Sales].[InvoiceLines] as IL on IL.InvoiceID = CT.InvoiceID
+	join [Warehouse].[StockItems] as SI	on SI.StockItemID = IL.StockItemID
+	join [Sales].[Invoices] as I on I.InvoiceID = IL.InvoiceID
+	where C.CustomerID = OuterC.CustomerID
+	order by SI.UnitPrice desc
+	) as InnerC
+order by  OuterC.CustomerID
