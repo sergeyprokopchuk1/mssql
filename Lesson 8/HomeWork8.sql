@@ -114,5 +114,27 @@ from
 	from [Sales].[Customers] as C
 	where C.CustomerName like 'Tailspin Toys%'
 )  Customers
-unpivot (AddressLine for ll2 in([A1], [A2], [A3], [A4])
-) as unpvt
+unpivot (AddressLine for ll2 in([A1], [A2], [A3], [A4])) as unpvt
+
+/*
+3. В таблице стран есть поля с кодом страны цифровым и буквенным
+сделайте выборку ИД страны, название, код - чтобы в поле был либо цифровой либо буквенный код
+Пример выдачи
+
+CountryId	CountryName	Code
+1	Afghanistan	AFG
+1	Afghanistan	4
+3	Albania	ALB
+3	Albania	8
+*/
+
+select CountryId, CountryName, Code
+from
+(
+	select C.CountryID as CountryId, 
+		C.CountryName as CountryName, 
+		C.IsoAlpha3Code as Alpha3Code, 
+		cast(C.IsoNumericCode as [nvarchar](3)) as NumericCode
+	from [Application].[Countries] as C
+) as Countries
+unpivot (Code for Code1 in([Alpha3Code], [NumericCode])) as unpvt
