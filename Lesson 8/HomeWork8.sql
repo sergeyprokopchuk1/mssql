@@ -47,6 +47,8 @@ CountryId	CountryName	Code
 Чем можно заменить CROSS APPLY - можно ли использовать другую стратегию выборки\запроса?
 */
 
+go
+
 /*
 1. 1. Требуется написать запрос, который в результате своего выполнения формирует таблицу следующего вида:
 Название клиента 
@@ -86,3 +88,31 @@ from
 pivot (sum(Customers.CustomerQuantity)
 for Customers.CustomerNameFragment in ([Peeples Valley, AZ], [Medicine Lodge, KS], [Gasport, NY], [Sylvanite, MT], [Jessie, ND])) as PVT
 order by FormatedDate;
+
+/*
+2. Для всех клиентов с именем, в котором есть Tailspin Toys
+вывести все адреса, которые есть в таблице, в одной колонке
+
+Пример результатов
+CustomerName	AddressLine
+Tailspin Toys (Head Office)	Shop 38
+Tailspin Toys (Head Office)	1877 Mittal Road
+Tailspin Toys (Head Office)	PO Box 8975
+Tailspin Toys (Head Office)	Ribeiroville
+.....
+*/
+
+select CustomerName, AddressLine
+from 
+(
+	select 
+		C.CustomerName as CustomerName
+		,C.DeliveryAddressLine1 as A1
+		,C.DeliveryAddressLine2 as A2
+		,C.PostalAddressLine1 as A3
+		,C.PostalAddressLine2 as A4
+	from [Sales].[Customers] as C
+	where C.CustomerName like 'Tailspin Toys%'
+)  Customers
+unpivot (AddressLine for ll2 in([A1], [A2], [A3], [A4])
+) as unpvt
